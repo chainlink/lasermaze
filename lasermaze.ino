@@ -1,12 +1,53 @@
 #include <Button.h>
+#include <Adafruit_NeoPixel.h>
+
 //http://playground.arduino.cc/Main/CountDownTimer
 
+//Clock init
 unsigned long Watch, _micro, time = micros();
 unsigned int Clock = 0, R_clock;
 boolean Reset = false, Stop = false, Paused = false;
 volatile boolean timeFlag = false;
 
-Button button = Button(12);
+//IO Pins
+#define NEOPIXEL_PIN 6
+#define BUTTON_PIN 12
+// Parameter 1 = number of pixels in strip
+// Parameter 2 = Arduino pin number (most are valid)
+// Parameter 3 = pixel type flags, add together as needed:
+//   NEO_KHZ800  800 KHz bitstream (most NeoPixel products w/WS2812 LEDs)
+//   NEO_KHZ400  400 KHz (classic 'v1' (not v2) FLORA pixels, WS2811 drivers)
+//   NEO_GRB     Pixels are wired for GRB bitstream (most NeoPixel products)
+//   NEO_RGB     Pixels are wired for RGB bitstream (v1 FLORA pixels, not v2)
+// 28 LEDS (7 segments * 5 pixels per seg * 4 digits)
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(140, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
+
+//Digit Segments
+// // b //
+// a    c
+// // d //
+// e    g
+// // f //
+byte DIGITS [10][7] = {
+ { 1, 1, 1, 0, 1, 1, 1 }, //ZERO
+ { 1, 0, 0, 0, 1, 0, 0 }, //ONE
+ { 0, 1, 1, 1, 1, 1, 0 }, //TWO
+ { 0, 1, 1, 1, 0, 1, 1 }, //THREE
+ { 1, 0, 1, 1, 1, 0, 0 }, //FOUR 
+ { 1, 1, 0, 1, 0, 1, 1 }, //FIVE
+ { 1, 1, 0, 1, 1, 1, 1 }, //SIX
+ { 0, 1, 1, 0, 0, 0, 1 }, //SEVEN
+ { 1, 1, 1, 1, 1, 1, 1 }, //EIGHT
+ { 1, 1, 1, 1, 0, 0, 1 }, //NINE
+};
+
+#define NUM_DIGITS 4
+#define SEG_LENGTH 5
+#define NUM_SEGMENTS 7 //7 Segments in display
+int seg_on = strip.Color(255, 0, 0); // Red
+int seg_off = strip.Color(0, 0, 0);//Black (off) 
+
+Button button = Button(BUTTON_PIN);
 
 void onPress(Button& b){
     Serial.print("HIT: ");
@@ -19,9 +60,12 @@ void onPress(Button& b){
 void setup()
 {
   Serial.begin(115200);
-  SetTimer(0,2,0); 
+  SetTimer(0,59,0); 
   StartTimer();
   button.pressHandler(onPress);  
+  strip.begin();
+  strip.setBrightness(60);
+  strip.show(); // Initialize all pixels to 'off'
 }
 
 void loop()
@@ -32,20 +76,78 @@ void loop()
   // this prevents the time from being constantly shown.
   if (TimeHasChanged() ) 
   {
-    Serial.print(ShowHours());
-    Serial.print(":");
-    Serial.print(ShowMinutes());
-    Serial.print(":");
-    Serial.print(ShowSeconds());
-    Serial.print(":");
-    Serial.print(ShowMilliSeconds());
-    Serial.print(":");
-    Serial.println(ShowMicroSeconds());
+    //Serial.print(ShowHours());
+    //Serial.print(":");
+    //Serial.print(ShowMinutes());
+    //Serial.print(":");
+    //Serial.print(ShowSeconds());
+    //Serial.print(":");
+    //Serial.print(ShowMilliSeconds());
+    //Serial.print(":");
+    //Serial.println(ShowMicroSeconds());
     // This DOES NOT format the time to 0:0x when seconds is less than 10.
     // if you need to format the time to standard format, use the sprintf() function.
+    setDigits();
   }
 }
 
+//Set display code
+// ------------------------------------------------------------------------------------------
+//Array representing values for each digit
+void setDigits() {
+  for(int digitIndex = 0; digitIndex < NUM_DIGITS; digitIndex++) {
+    int digit;
+    if (digitIndex == 0) {
+      digit = ( ShowMinutes() / 10 ) % 10;
+    } else if (digitIndex == 1) {
+      digit = ShowMinutes() % 10;
+    } else if (digitIndex == 2) {
+      digit = ( ShowSeconds() / 10 ) % 10;
+    } else if (digitIndex == 3) {
+      digit = ShowSeconds() % 10;
+    }
+    
+    Serial.print(digit);
+    Serial.print(":");
+    for(int segmentIndex = 0; segmentIndex < NUM_SEGMENTS; segmentIndex++) {
+      //Digit Offset + Segment Offset
+      int startIndex = (digitIndex * 7 * SEG_LENGTH) + (segmentIndex * SEG_LENGTH);
+      //Digit offset + segment offset + seg length
+      int endIndex = startIndex + SEG_LENGTH;
+      
+      //Determine if segment on or off
+      if (DIGITS[digit][segmentIndex] == 1){
+        //ON
+        setRangeOn(startIndex, endIndex);
+        //Serial.print("ON:");
+        //Serial.print(startIndex);
+        //Serial.print(":");
+        //Serial.print(endIndex);
+      } else {
+        //OFF
+        setRangeOff(startIndex, endIndex);
+      }
+    }
+  }
+  Serial.println();
+  strip.show();
+}
+
+//Sets Neopixel on or off (inclusive)
+void setRangeOn(int startIndex, int endIndex) {
+  for(int i = startIndex; i <= endIndex; i++) {
+    strip.setPixelColor(i, strip.Color(255, 0, 0)); 
+  }
+}
+void setRangeOff(int startIndex, int endIndex) {
+  for(int i = startIndex; i <= endIndex; i++) {
+    strip.setPixelColor(i, strip.Color(0, 0, 0)); 
+  }
+}
+// ------------------------------------------------------------------------------------------
+
+// Timer Code
+// ------------------------------------------------------------------------------------------
 boolean CountDownTimer()
 {
   static unsigned long duration = 1000000; // 1 second
@@ -162,5 +264,5 @@ boolean TimeCheck(unsigned int hours, unsigned int minutes, unsigned int seconds
 {
   return (hours == ShowHours() && minutes == ShowMinutes() && seconds == ShowSeconds());
 }
-
+// ------------------------------------------------------------------------------------------
 
