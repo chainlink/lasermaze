@@ -1,19 +1,34 @@
+#include <Button.h>
+//http://playground.arduino.cc/Main/CountDownTimer
+
 unsigned long Watch, _micro, time = micros();
 unsigned int Clock = 0, R_clock;
 boolean Reset = false, Stop = false, Paused = false;
 volatile boolean timeFlag = false;
 
+Button button = Button(12);
+
+void onPress(Button& b){
+    Serial.print("HIT: ");
+    int totalSeconds = ShowTotalSeconds();
+    Serial.println(totalSeconds);
+    int newTime = totalSeconds - 30;
+    SetTimer(newTime);
+}
+
 void setup()
 {
   Serial.begin(115200);
   SetTimer(0,2,0); 
-  StartTimer();  
+  StartTimer();
+  button.pressHandler(onPress);  
 }
 
 void loop()
 {
   CountDownTimer(); // run the timer
-
+  // update the buttons' internals
+  button.process();
   // this prevents the time from being constantly shown.
   if (TimeHasChanged() ) 
   {
@@ -124,6 +139,9 @@ int ShowSeconds()
   return Clock % 60;
 }
 
+int ShowTotalSeconds() {
+   return Clock; 
+}
 unsigned long ShowMilliSeconds()
 {
   return (_micro - Watch)/ 1000.0;
